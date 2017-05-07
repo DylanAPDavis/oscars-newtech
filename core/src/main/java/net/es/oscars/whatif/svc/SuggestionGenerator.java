@@ -44,6 +44,31 @@ public class SuggestionGenerator {
         this.bwAvailService = bwAvailService;
     }
 
+    private Date addTime(Date d, Integer increment, Integer amount) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(d);
+        cal.add(increment, amount);
+        return cal.getTime();
+    }
+
+    private void testAndAddConnection(List<Connection> connections, Connection conn) {
+
+        // Run a precheck
+        Connection result = null;
+        try {
+            result = resvController.preCheck(conn);
+            if(result != null){
+                // Determine if result is successful. If so, consider storing it as an option
+                if(result.getReserved().getVlanFlow().getAllPaths().size() > 0){
+                    // Success!  Now we can add this connection to our list
+                    connections.add(result);
+                }
+            }
+        }
+        catch(PCEException |PSSException e){
+            log.info("Connection precheck caused an exception.");
+        }
+    }
 
     /**
      * Generate a list of viable connections given a Start Date, End Date, and requested transfer Volume.
@@ -111,21 +136,7 @@ public class SuggestionGenerator {
             Connection conn = createInitialConnection(spec.getSrcDevice(), spec.getSrcPorts(), spec.getDstDevice(),
                     spec.getDstPorts(), azMbps, zaMbps, connectionId, start, end);
 
-            // Run a precheck
-            Connection result = null;
-            try {
-                result = resvController.preCheck(conn);
-                if(result != null){
-                    // Determine if result is successful. If so, consider storing it as an option
-                    if(result.getReserved().getVlanFlow().getAllPaths().size() > 0){
-                        // Success!  Now we can add this connection to our list
-                        connections.add(result);
-                    }
-                }
-            }
-            catch(PCEException |PSSException e){
-                log.info("Connection precheck caused an exception.");
-            }
+            testAndAddConnection(connections, conn);
         }
 
 
@@ -174,21 +185,7 @@ public class SuggestionGenerator {
         Connection conn = createInitialConnection(spec.getSrcDevice(), spec.getSrcPorts(), spec.getDstDevice(),
                 spec.getDstPorts(), azMbps, zaMbps, connectionId, start, end);
 
-        // Run a precheck
-        Connection result = null;
-        try {
-            result = resvController.preCheck(conn);
-            if(result != null){
-                // Determine if result is successful. If so, consider storing it as an option
-                if(result.getReserved().getVlanFlow().getAllPaths().size() > 0){
-                    // Success!  Now we can add this connection to our list
-                    connections.add(result);
-                }
-            }
-        }
-        catch(PCEException |PSSException e){
-            log.info("Connection precheck caused an exception.");
-        }
+        testAndAddConnection(connections, conn);
 
         return connections;
     }
@@ -199,8 +196,154 @@ public class SuggestionGenerator {
      * @param spec - Submitted request specification.
      * @return A list of connections that could satisfy the demand.
      */
-    public List<Connection> generateWithStartVolume(WhatifSpecification spec) {
-        return new ArrayList<>();
+    public List<Connection> generateWithStartVolume(WhatifSpecification spec, List<Integer> otherOptions) {
+
+        List<Connection> connections = new ArrayList<>();
+        Integer volume = spec.getVolume();
+        Date start = dateService.parseDate(spec.getStartDate());
+
+        // The end time will be set two years in the future to obtain
+        // the largest bandwidth availability map possible
+        Date end = addTime(start, Calendar.YEAR, 2);
+
+        BandwidthAvailabilityRequest bwAvailRequest = createBwAvailRequest(spec.getSrcDevice(), spec.getSrcPorts(),
+                spec.getDstDevice(), spec.getDstPorts(), 0, 0, start, end);
+        BandwidthAvailabilityResponse bwResponse = bwAvailService.getBandwidthAvailabilityMap(bwAvailRequest);
+
+        Map<Instant, Integer> bwMap = bwResponse.getBwAvailabilityMap().get("Az1");
+
+        // Now we will sort the keys from the bandwidth availability map in chronological order
+        List<Instant> times = new ArrayList<Instant>();
+        times.addAll(bwMap.keySet());
+        Collections.sort(times, new Comparator<Instant>() {
+            @Override
+            public int compare(Instant o1, Instant o2) {
+                return o1.compareTo(o2);
+            }
+        });
+
+
+        Integer minimumBandwidth = null;
+        Integer bestOptionBandwidth = null;
+
+        // Go through all critical points in the bandwidth availability map
+        // Calculate the minimum bandwidth available across the map
+        for(Instant instant : times) {
+            Integer bandwidth = bwMap.get(instant);
+            if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+                minimumBandwidth = bandwidth;
+                if(minimumBandwidth == 0) {
+                    return connections;
+                }
+            }
+
+            // Now we can check if we have enough bandwidth and time to perform the user's allocation
+            Integer secondsBetween = (int) (( Date.from(instant).getTime() - start.getTime()) / 1000);
+            Integer bandwidthNeeded = (int) Math.ceil(1.0 * volume / secondsBetween);
+
+            if(bandwidthNeeded <= bandwidth) {
+                // If so, create the "best option" connection
+                bestOptionBandwidth = minimumBandwidth;
+                Integer durationSec = (int) (Math.ceil(1.0 * volume / minimumBandwidth));
+                Date bestOptionEndTime = addTime(start, Calendar.SECOND, durationSec);
+
+                // Create an initial connection from parameters
+                Connection conn = createInitialConnection(spec.getSrcDevice(), spec.getSrcPorts(), spec.getDstDevice(),
+                        spec.getDstPorts(), bestOptionBandwidth, bestOptionBandwidth, "startVolumeBest", start, bestOptionEndTime);
+
+                testAndAddConnection(connections, conn);
+                break;
+            }
+        }
+
+        // If the loop did not find a single possible option, return the empty list of connections
+        if(bestOptionBandwidth == null) return connections;
+
+        // Sort the other options in descending order
+        // This will allow us to check the highest possible bandwidth options first
+        Collections.sort(otherOptions, Collections.reverseOrder());
+
+        List<Integer> invalidOptions = new ArrayList<Integer>();
+
+        for(Integer i = 0; i < otherOptions.size(); i++) {
+            Integer option = otherOptions.get(i);
+            Integer bandwidthNeeded = (int) (option / 100.0 * bestOptionBandwidth);
+            Integer durationSec = (int) (Math.ceil(1.0 * volume / bandwidthNeeded));
+            Date optionEnd = addTime(start, Calendar.SECOND, durationSec);
+            minimumBandwidth = null;
+
+            for(Instant instant : times) {
+                Integer bandwidth = bwMap.get(instant);
+                if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+                    minimumBandwidth = bandwidth;
+                    if(minimumBandwidth == 0) {
+                        return connections;
+                    }
+                }
+                // Check if we have gone past the point where the current allocation will end
+                if(Date.from(instant).compareTo(optionEnd) > 0) {
+                    if(minimumBandwidth < bandwidthNeeded) {
+                        invalidOptions.add(i);
+                    }
+                    else {
+                        // This is a valid option!  Now attempt to create a connection
+                        // Create an initial connection from parameters
+                        Connection conn = createInitialConnection(spec.getSrcDevice(), spec.getSrcPorts(), spec.getDstDevice(),
+                                spec.getDstPorts(), bandwidthNeeded, bandwidthNeeded, "startVolumeOption" + i, start, optionEnd);
+
+                        testAndAddConnection(connections, conn);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Now we must go through all invalid options and attempt to correct them
+
+        for(Integer optionIndex : invalidOptions) {
+            Integer option = otherOptions.get(optionIndex);
+            Integer bandwidthNeeded = (int) (option / 100.0 * bestOptionBandwidth);
+            Integer durationSec = (int) (Math.ceil(1.0 * volume / bandwidthNeeded));
+            Date optionEnd = addTime(start, Calendar.SECOND, durationSec);
+            minimumBandwidth = null;
+
+            Integer neighborBandwidth = null;
+            if(optionIndex + 1 < otherOptions.size()) {
+                neighborBandwidth = (int) (otherOptions.get(optionIndex + 1) / 100.0 * bestOptionBandwidth);
+            }
+
+            for(Instant instant : times) {
+                Integer bandwidth = bwMap.get(instant);
+                if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+                    minimumBandwidth = bandwidth;
+                    if (minimumBandwidth == 0) {
+                        return connections;
+                    }
+                }
+                // Check if we have gone past the point where the current allocation will end
+                if(Date.from(instant).compareTo(optionEnd) > 0) {
+                    if(minimumBandwidth < bandwidthNeeded) {
+                        bandwidthNeeded = minimumBandwidth;
+                        if(bandwidthNeeded < neighborBandwidth) {
+                            break; // This option is "dead"
+                        }
+                        // Recalculate our end time given the new bandwidth value
+                        durationSec = (int) (Math.ceil(1.0 * volume / bandwidthNeeded));
+                        optionEnd = addTime(start, Calendar.SECOND, durationSec);
+                    }
+                    else {
+                        // This option has been successfully reworked!  Now attempt to create a connection
+                        // Create an initial connection from parameters
+                        Connection conn = createInitialConnection(spec.getSrcDevice(), spec.getSrcPorts(), spec.getDstDevice(),
+                                spec.getDstPorts(), bandwidthNeeded, bandwidthNeeded, "startVolumeOption(adjusted)" + optionIndex, start, optionEnd);
+
+                        testAndAddConnection(connections, conn);
+                    }
+                }
+            }
+        }
+
+        return connections;
     }
 
     /**

@@ -134,6 +134,11 @@
             <version>2.4.6</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.hashids</groupId>
+            <artifactId>hashids</artifactId>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 
