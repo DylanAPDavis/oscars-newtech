@@ -230,18 +230,16 @@ public class SuggestionGenerator {
         // Calculate the minimum bandwidth available across the map
         for(Instant instant : times) {
             Integer bandwidth = bwMap.get(instant);
-            if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+
+            if(minimumBandwidth == null) {
                 minimumBandwidth = bandwidth;
-                if(minimumBandwidth == 0) {
-                    return connections;
-                }
             }
 
             // Now we can check if we have enough bandwidth and time to perform the user's allocation
             Integer secondsBetween = (int) (( Date.from(instant).getTime() - start.getTime()) / 1000);
             Integer bandwidthNeeded = (int) Math.ceil(1.0 * volume / secondsBetween);
 
-            if(bandwidthNeeded <= bandwidth) {
+            if(bandwidthNeeded <= minimumBandwidth) {
                 // If so, create the "best option" connection
                 bestOptionBandwidth = minimumBandwidth;
                 Integer durationSec = (int) (Math.ceil(1.0 * volume / minimumBandwidth));
@@ -253,6 +251,13 @@ public class SuggestionGenerator {
 
                 testAndAddConnection(connections, conn);
                 break;
+            }
+
+            if (bandwidth < minimumBandwidth) {
+                minimumBandwidth = bandwidth;
+                if(minimumBandwidth == 0) {
+                    return connections;
+                }
             }
         }
 
@@ -274,11 +279,8 @@ public class SuggestionGenerator {
 
             for(Instant instant : times) {
                 Integer bandwidth = bwMap.get(instant);
-                if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+                if (minimumBandwidth == null) {
                     minimumBandwidth = bandwidth;
-                    if(minimumBandwidth == 0) {
-                        return connections;
-                    }
                 }
                 // Check if we have gone past the point where the current allocation will end
                 if(Date.from(instant).compareTo(optionEnd) > 0) {
@@ -295,6 +297,13 @@ public class SuggestionGenerator {
                     }
                     break;
                 }
+
+                if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+                    minimumBandwidth = bandwidth;
+                    if(minimumBandwidth == 0) {
+                        return connections;
+                    }
+                }
             }
         }
 
@@ -302,11 +311,12 @@ public class SuggestionGenerator {
 
         for(Integer optionIndex : invalidOptions) {
             Integer option = otherOptions.get(optionIndex);
-            Integer bandwidthNeeded = (int) (option / 100.0 * bestOptionBandwidth);
+            Integer bandwidthNeeded = (int) (Math.ceil(option / 100.0 * bestOptionBandwidth));
             Integer durationSec = (int) (Math.ceil(1.0 * volume / bandwidthNeeded));
             Date optionEnd = addTime(start, Calendar.SECOND, durationSec);
             minimumBandwidth = null;
 
+            // Determine the "neighbor" bandwidth (the option immediately after the current one)
             Integer neighborBandwidth = null;
             if(optionIndex + 1 < otherOptions.size()) {
                 neighborBandwidth = (int) (otherOptions.get(optionIndex + 1) / 100.0 * bestOptionBandwidth);
@@ -314,17 +324,15 @@ public class SuggestionGenerator {
 
             for(Instant instant : times) {
                 Integer bandwidth = bwMap.get(instant);
-                if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+
+                if (minimumBandwidth == null) {
                     minimumBandwidth = bandwidth;
-                    if (minimumBandwidth == 0) {
-                        return connections;
-                    }
                 }
                 // Check if we have gone past the point where the current allocation will end
                 if(Date.from(instant).compareTo(optionEnd) > 0) {
                     if(minimumBandwidth < bandwidthNeeded) {
                         bandwidthNeeded = minimumBandwidth;
-                        if(bandwidthNeeded < neighborBandwidth) {
+                        if(neighborBandwidth == null || bandwidthNeeded < neighborBandwidth) {
                             break; // This option is "dead"
                         }
                         // Recalculate our end time given the new bandwidth value
@@ -338,6 +346,14 @@ public class SuggestionGenerator {
                                 spec.getDstPorts(), bandwidthNeeded, bandwidthNeeded, "startVolumeOption(adjusted)" + optionIndex, start, optionEnd);
 
                         testAndAddConnection(connections, conn);
+                        break;
+                    }
+                }
+
+                if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+                    minimumBandwidth = bandwidth;
+                    if (minimumBandwidth == 0) {
+                        return connections;
                     }
                 }
             }
