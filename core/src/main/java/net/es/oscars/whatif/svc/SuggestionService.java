@@ -67,7 +67,7 @@ public class SuggestionService {
 //            connections.addAll(suggestionGenerator.generateWithStartVolume(spec));
         }
         if(connections.size() == 0 && specifiedEndVolume){
-            connections.addAll(suggestionGenerator.generateWithEndVolume(spec));
+//            connections.addAll(suggestionGenerator.generateWithEndVolume(spec));
         }
         if(connections.size() == 0 && specifiedStartVolumeBandwidth){
             connections.addAll(suggestionGenerator.generateWithStartVolumeBandwidth(spec));

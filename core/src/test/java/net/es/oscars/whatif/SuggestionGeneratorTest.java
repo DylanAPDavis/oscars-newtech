@@ -467,7 +467,6 @@ public class SuggestionGeneratorTest  extends AbstractCoreTest {
         assert(suggestions.size() == 0);
     }
 
-
     @Test
     public void startVolumeTest1() {
         reservedBandwidthRepo.deleteAll();
@@ -684,6 +683,228 @@ public class SuggestionGeneratorTest  extends AbstractCoreTest {
 
 
         List<Connection> suggestions = suggestionGenerator.generateWithStartVolume(spec, Arrays.asList(20, 40, 60, 80));
+
+        assert(suggestions.size() == 5);
+
+        confirmBandwidths(suggestions, Arrays.asList(200, 160, 80, 40, 110));
+    }
+
+    @Test
+    public void endVolumeTest1() {
+        reservedBandwidthRepo.deleteAll();
+        topologyBuilder.buildTopo2();
+
+        List<String> reservedStartTimesStr = new ArrayList<>();
+        List<String> reservedEndTimesStr = new ArrayList<>();
+        List<Integer> reservedEgInBandwidths = new ArrayList<>();
+
+        reservedEgInBandwidths.add(900);
+        reservedStartTimesStr.add("01 01 2020 00:01");
+        reservedEndTimesStr.add("01 01 2020 10:00");
+
+        reserveBandwidth(reservedEgInBandwidths, reservedStartTimesStr, reservedEndTimesStr);
+
+        String endDate = "01 01 2020 10:01";
+        Set<String> srcPorts = Collections.singleton("portA");
+        String srcDevice = "nodeP";
+        Set<String> dstPorts = Collections.singleton("portZ");
+        String dstDevice = "nodeM";
+        Integer volume = 100000;
+        Integer bandwidthMbps = null;
+        Long durationMinutes = null;
+        WhatifSpecification spec = WhatifSpecification.builder()
+                .endDate(endDate)
+                .srcPorts(srcPorts)
+                .srcDevice(srcDevice)
+                .dstPorts(dstPorts)
+                .dstDevice(dstDevice)
+                .volume(volume)
+                .bandwidthMbps(bandwidthMbps)
+                .durationMinutes(durationMinutes)
+                .build();
+
+
+        List<Connection> suggestions = suggestionGenerator.generateWithEndVolume(spec, Arrays.asList(25, 50, 75));
+
+        assert(suggestions.size() == 4);
+
+        confirmBandwidths(suggestions, Arrays.asList(100, 75, 50, 25));
+    }
+
+    @Test
+    public void endVolumeTest2() {
+        reservedBandwidthRepo.deleteAll();
+        topologyBuilder.buildTopo2();
+
+        List<String> reservedStartTimesStr = new ArrayList<>();
+        List<String> reservedEndTimesStr = new ArrayList<>();
+        List<Integer> reservedEgInBandwidths = new ArrayList<>();
+
+        reservedEgInBandwidths.add(900);
+        reservedStartTimesStr.add("01 01 2020 00:01");
+        reservedEndTimesStr.add("01 01 2020 10:00");
+
+        reservedEgInBandwidths.add(35);
+        reservedStartTimesStr.add("01 01 2020 06:00");
+        reservedEndTimesStr.add("01 01 2020 07:00");
+
+        reserveBandwidth(reservedEgInBandwidths, reservedStartTimesStr, reservedEndTimesStr);
+
+        String endDate = "01 01 2020 10:00";
+        Set<String> srcPorts = Collections.singleton("portA");
+        String srcDevice = "nodeP";
+        Set<String> dstPorts = Collections.singleton("portZ");
+        String dstDevice = "nodeM";
+        Integer volume = 1000000;
+        Integer bandwidthMbps = null;
+        Long durationMinutes = null;
+        WhatifSpecification spec = WhatifSpecification.builder()
+                .endDate(endDate)
+                .srcPorts(srcPorts)
+                .srcDevice(srcDevice)
+                .dstPorts(dstPorts)
+                .dstDevice(dstDevice)
+                .volume(volume)
+                .bandwidthMbps(bandwidthMbps)
+                .durationMinutes(durationMinutes)
+                .build();
+
+
+        List<Connection> suggestions = suggestionGenerator.generateWithEndVolume(spec, Arrays.asList(25, 50, 75));
+
+        assert(suggestions.size() == 4);
+
+        confirmBandwidths(suggestions, Arrays.asList(100, 50, 25, 65));
+    }
+
+    @Test
+    public void endVolumeTest3() {
+        reservedBandwidthRepo.deleteAll();
+        topologyBuilder.buildTopo2();
+
+        List<String> reservedStartTimesStr = new ArrayList<>();
+        List<String> reservedEndTimesStr = new ArrayList<>();
+        List<Integer> reservedEgInBandwidths = new ArrayList<>();
+
+        reservedEgInBandwidths.add(900);
+        reservedStartTimesStr.add("01 01 2020 00:01");
+        reservedEndTimesStr.add("01 01 2020 10:00");
+
+        reservedEgInBandwidths.add(60);
+        reservedStartTimesStr.add("01 01 2020 06:00");
+        reservedEndTimesStr.add("01 01 2020 07:00");
+
+        reserveBandwidth(reservedEgInBandwidths, reservedStartTimesStr, reservedEndTimesStr);
+
+        String endDate = "01 01 2020 10:00";
+        Set<String> srcPorts = Collections.singleton("portA");
+        String srcDevice = "nodeP";
+        Set<String> dstPorts = Collections.singleton("portZ");
+        String dstDevice = "nodeM";
+        Integer volume = 1000000;
+        Integer bandwidthMbps = null;
+        Long durationMinutes = null;
+        WhatifSpecification spec = WhatifSpecification.builder()
+                .endDate(endDate)
+                .srcPorts(srcPorts)
+                .srcDevice(srcDevice)
+                .dstPorts(dstPorts)
+                .dstDevice(dstDevice)
+                .volume(volume)
+                .bandwidthMbps(bandwidthMbps)
+                .durationMinutes(durationMinutes)
+                .build();
+
+
+        List<Connection> suggestions = suggestionGenerator.generateWithEndVolume(spec, Arrays.asList(25, 50, 75));
+
+        assert(suggestions.size() == 3);
+
+        confirmBandwidths(suggestions, Arrays.asList(100, 25, 40));
+    }
+
+    @Test
+    public void endVolumeTest4() {
+        reservedBandwidthRepo.deleteAll();
+        topologyBuilder.buildTopo2();
+
+        List<String> reservedStartTimesStr = new ArrayList<>();
+        List<String> reservedEndTimesStr = new ArrayList<>();
+        List<Integer> reservedEgInBandwidths = new ArrayList<>();
+
+        reservedEgInBandwidths.add(800);
+        reservedStartTimesStr.add("01 01 2020 00:01");
+        reservedEndTimesStr.add("01 01 2020 10:00");
+
+        reserveBandwidth(reservedEgInBandwidths, reservedStartTimesStr, reservedEndTimesStr);
+
+        String endDate = "01 01 2020 10:00";
+        Set<String> srcPorts = Collections.singleton("portA");
+        String srcDevice = "nodeP";
+        Set<String> dstPorts = Collections.singleton("portZ");
+        String dstDevice = "nodeM";
+        Integer volume = 1000000;
+        Integer bandwidthMbps = null;
+        Long durationMinutes = null;
+        WhatifSpecification spec = WhatifSpecification.builder()
+                .endDate(endDate)
+                .srcPorts(srcPorts)
+                .srcDevice(srcDevice)
+                .dstPorts(dstPorts)
+                .dstDevice(dstDevice)
+                .volume(volume)
+                .bandwidthMbps(bandwidthMbps)
+                .durationMinutes(durationMinutes)
+                .build();
+
+
+        List<Connection> suggestions = suggestionGenerator.generateWithEndVolume(spec, Arrays.asList(20, 40, 60, 80));
+
+        assert(suggestions.size() == 5);
+
+        confirmBandwidths(suggestions, Arrays.asList(200, 160, 120, 80, 40));
+    }
+
+    @Test
+    public void endVolumeTest5() {
+        reservedBandwidthRepo.deleteAll();
+        topologyBuilder.buildTopo2();
+
+        List<String> reservedStartTimesStr = new ArrayList<>();
+        List<String> reservedEndTimesStr = new ArrayList<>();
+        List<Integer> reservedEgInBandwidths = new ArrayList<>();
+
+        reservedEgInBandwidths.add(800);
+        reservedStartTimesStr.add("01 01 2020 00:01");
+        reservedEndTimesStr.add("01 01 2020 10:00");
+
+        reservedEgInBandwidths.add(90);
+        reservedStartTimesStr.add("01 01 2020 07:00");
+        reservedEndTimesStr.add("01 01 2020 08:00");
+
+        reserveBandwidth(reservedEgInBandwidths, reservedStartTimesStr, reservedEndTimesStr);
+
+        String endDate = "01 01 2020 10:00";
+        Set<String> srcPorts = Collections.singleton("portA");
+        String srcDevice = "nodeP";
+        Set<String> dstPorts = Collections.singleton("portZ");
+        String dstDevice = "nodeM";
+        Integer volume = 1000000;
+        Integer bandwidthMbps = null;
+        Long durationMinutes = null;
+        WhatifSpecification spec = WhatifSpecification.builder()
+                .endDate(endDate)
+                .srcPorts(srcPorts)
+                .srcDevice(srcDevice)
+                .dstPorts(dstPorts)
+                .dstDevice(dstDevice)
+                .volume(volume)
+                .bandwidthMbps(bandwidthMbps)
+                .durationMinutes(durationMinutes)
+                .build();
+
+
+        List<Connection> suggestions = suggestionGenerator.generateWithEndVolume(spec, Arrays.asList(20, 40, 60, 80));
 
         assert(suggestions.size() == 5);
 

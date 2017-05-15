@@ -368,8 +368,157 @@ public class SuggestionGenerator {
      * @param spec - Submitted request specification.
      * @return A list of connections that could satisfy the demand.
      */
-    public List<Connection> generateWithEndVolume(WhatifSpecification spec) {
-        return new ArrayList<>();
+    public List<Connection> generateWithEndVolume(WhatifSpecification spec, List<Integer> otherOptions) {
+        List<Connection> connections = new ArrayList<>();
+        Integer volume = spec.getVolume();
+        Date end = dateService.parseDate(spec.getEndDate());
+
+        // The start time will be the current date and time
+        Date start = Calendar.getInstance().getTime();
+
+        BandwidthAvailabilityRequest bwAvailRequest = createBwAvailRequest(spec.getSrcDevice(), spec.getSrcPorts(),
+                spec.getDstDevice(), spec.getDstPorts(), 0, 0, start, end);
+        BandwidthAvailabilityResponse bwResponse = bwAvailService.getBandwidthAvailabilityMap(bwAvailRequest);
+
+        Map<Instant, Integer> bwMap = bwResponse.getBwAvailabilityMap().get("Az1");
+
+        // Now we will sort the keys from the bandwidth availability map in reverse chronological order
+        List<Instant> times = new ArrayList<Instant>();
+        times.addAll(bwMap.keySet());
+        Collections.sort(times, new Comparator<Instant>() {
+            @Override
+            public int compare(Instant o1, Instant o2) {
+                return o2.compareTo(o1);
+            }
+        });
+
+        Integer minimumBandwidth = null;
+        Integer bestOptionBandwidth = null;
+
+        // Go through all critical points in the bandwidth availability map
+        // Calculate the minimum bandwidth available across the map
+        for(Instant instant : times) {
+            Integer bandwidth = bwMap.get(instant);
+
+            if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+                minimumBandwidth = bandwidth;
+                if(minimumBandwidth == 0) {
+                    return connections;
+                }
+            }
+
+            // Now we can check if we have enough bandwidth and time to perform the user's allocation
+            Integer secondsBetween = (int) ((end.getTime() - Date.from(instant).getTime()) / 1000);
+            Integer bandwidthNeeded = (int) Math.ceil(1.0 * volume / secondsBetween);
+
+            if(bandwidthNeeded <= minimumBandwidth) {
+                // If so, create the "best option" connection
+                bestOptionBandwidth = minimumBandwidth;
+                Integer durationSec = (int) (Math.ceil(1.0 * volume / minimumBandwidth));
+                Date bestOptionStartTime = addTime(end, Calendar.SECOND, -1 * durationSec);
+
+                // Create an initial connection from parameters
+                Connection conn = createInitialConnection(spec.getSrcDevice(), spec.getSrcPorts(), spec.getDstDevice(),
+                        spec.getDstPorts(), bestOptionBandwidth, bestOptionBandwidth, "endVolumeBest", bestOptionStartTime, end);
+
+                testAndAddConnection(connections, conn);
+                break;
+            }
+        }
+
+        // If the loop did not find a single possible option, return the empty list of connections
+        if(bestOptionBandwidth == null) return connections;
+
+        // Sort the other options in descending order
+        // This will allow us to check the highest possible bandwidth options first
+        Collections.sort(otherOptions, Collections.reverseOrder());
+
+        List<Integer> invalidOptions = new ArrayList<Integer>();
+
+        for(Integer i = 0; i < otherOptions.size(); i++) {
+            Integer option = otherOptions.get(i);
+            Integer bandwidthNeeded = (int) (option / 100.0 * bestOptionBandwidth);
+            Integer durationSec = (int) (Math.ceil(1.0 * volume / bandwidthNeeded));
+            Date optionStart = addTime(end, Calendar.SECOND, -1 * durationSec);
+            minimumBandwidth = null;
+
+            for(Instant instant : times) {
+                Integer bandwidth = bwMap.get(instant);
+
+                if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+                    minimumBandwidth = bandwidth;
+                    if(minimumBandwidth == 0) {
+                        return connections;
+                    }
+                }
+                // Check if we have gone past the point where the current allocation will end
+                if(optionStart.compareTo(Date.from(instant)) > 0) {
+                    if(minimumBandwidth < bandwidthNeeded) {
+                        invalidOptions.add(i);
+                    }
+                    else {
+                        // This is a valid option!  Now attempt to create a connection
+                        // Create an initial connection from parameters
+                        Connection conn = createInitialConnection(spec.getSrcDevice(), spec.getSrcPorts(), spec.getDstDevice(),
+                                spec.getDstPorts(), bandwidthNeeded, bandwidthNeeded, "endVolumeOption" + i, optionStart, end);
+
+                        testAndAddConnection(connections, conn);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Now we must go through all invalid options and attempt to correct them
+
+        for(Integer optionIndex : invalidOptions) {
+            Integer option = otherOptions.get(optionIndex);
+            Integer bandwidthNeeded = (int) (Math.ceil(option / 100.0 * bestOptionBandwidth));
+            Integer durationSec = (int) (Math.ceil(1.0 * volume / bandwidthNeeded));
+            Date optionStart = addTime(end, Calendar.SECOND, -1 * durationSec);
+            minimumBandwidth = null;
+
+            // Determine the "neighbor" bandwidth (the option immediately after the current one)
+            Integer neighborBandwidth = null;
+            if(optionIndex + 1 < otherOptions.size()) {
+                neighborBandwidth = (int) (otherOptions.get(optionIndex + 1) / 100.0 * bestOptionBandwidth);
+            }
+
+            for(Instant instant : times) {
+                Integer bandwidth = bwMap.get(instant);
+
+                if (minimumBandwidth == null || bandwidth < minimumBandwidth) {
+                    minimumBandwidth = bandwidth;
+                    if(minimumBandwidth == 0) {
+                        return connections;
+                    }
+                }
+                // Check if we have gone past the point where the current allocation will end
+                if(optionStart.compareTo(Date.from(instant)) > 0) {
+
+                    if(minimumBandwidth < bandwidthNeeded) {
+                        bandwidthNeeded = minimumBandwidth;
+                        if(neighborBandwidth == null || bandwidthNeeded < neighborBandwidth) {
+                            break; // This option is "dead"
+                        }
+                        // Recalculate our end time given the new bandwidth value
+                        durationSec = (int) (Math.ceil(1.0 * volume / bandwidthNeeded));
+                        optionStart = addTime(end, Calendar.SECOND, -1 * durationSec);
+                    }
+                    else {
+                        // This option has been successfully reworked!  Now attempt to create a connection
+                        // Create an initial connection from parameters
+                        Connection conn = createInitialConnection(spec.getSrcDevice(), spec.getSrcPorts(), spec.getDstDevice(),
+                                spec.getDstPorts(), bandwidthNeeded, bandwidthNeeded, "endVolumeOption(adjusted)" + optionIndex, optionStart, end);
+
+                        testAndAddConnection(connections, conn);
+                        break;
+                    }
+                }
+            }
+        }
+
+        return connections;
     }
 
     /**
