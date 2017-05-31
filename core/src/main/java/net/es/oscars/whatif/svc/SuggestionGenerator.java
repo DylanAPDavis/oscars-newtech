@@ -70,6 +70,160 @@ public class SuggestionGenerator {
         }
     }
 
+
+
+    public List<Connection> generateStartEndWindowsVolume(WhatifSpecification spec, String earliestStartStr, String latestStartStr, String earliestDeadlineStr, String latestDeadlineStr) {
+        List<Connection> connections = new ArrayList<>();
+        List<Date> possibleStartTimes = new ArrayList<>();
+        List<Date> possibleEndTimes = new ArrayList<>();
+        List<Integer> possibleBandwidths = new ArrayList<>();
+
+        Integer volume = spec.getVolume();
+        Date earliestStart = dateService.parseDate(earliestStartStr);
+        Date latestStart = dateService.parseDate(latestStartStr);
+        Date earliestDeadline = dateService.parseDate(earliestDeadlineStr);
+        Date latestDeadline = dateService.parseDate(latestDeadlineStr);
+
+        // Creating map from earliest start to latest deadline
+        BandwidthAvailabilityRequest bwAvailRequest = createBwAvailRequest(spec.getSrcDevice(), spec.getSrcPorts(),
+                spec.getDstDevice(), spec.getDstPorts(), 0, 0, earliestStart, latestDeadline);
+        BandwidthAvailabilityResponse bwResponse = bwAvailService.getBandwidthAvailabilityMap(bwAvailRequest);
+
+        Map<Instant, Integer> bwMap = bwResponse.getBwAvailabilityMap().get("Az1");
+
+        // Creating map of possible start times
+        BandwidthAvailabilityRequest bwAvailRequestStarts = createBwAvailRequest(spec.getSrcDevice(), spec.getSrcPorts(),
+                spec.getDstDevice(), spec.getDstPorts(), 0, 0, earliestStart, latestStart);
+        BandwidthAvailabilityResponse bwResponseStarts = bwAvailService.getBandwidthAvailabilityMap(bwAvailRequestStarts);
+
+        Map<Instant, Integer> bwMapStarts = bwResponseStarts.getBwAvailabilityMap().get("Az1");
+
+        // Creating map of possible end times
+        BandwidthAvailabilityRequest bwAvailRequestDeadlines = createBwAvailRequest(spec.getSrcDevice(), spec.getSrcPorts(),
+                spec.getDstDevice(), spec.getDstPorts(), 0, 0, earliestDeadline, latestDeadline);
+        BandwidthAvailabilityResponse bwResponseDeadlines = bwAvailService.getBandwidthAvailabilityMap(bwAvailRequestDeadlines);
+
+        Map<Instant, Integer> bwMapDeadlines = bwResponseDeadlines.getBwAvailabilityMap().get("Az1");
+
+
+        // Now sort all three lists of times
+        List<Instant> times = new ArrayList<Instant>();
+        times.addAll(bwMap.keySet());
+        Collections.sort(times, new Comparator<Instant>() {
+            @Override
+            public int compare(Instant o1, Instant o2) {
+                return o1.compareTo(o2);
+            }
+        });
+
+        List<Instant> startTimes = new ArrayList<Instant>();
+        startTimes.addAll(bwMapDeadlines.keySet());
+        Collections.sort(startTimes, new Comparator<Instant>() {
+            @Override
+            public int compare(Instant o1, Instant o2) {
+                return o1.compareTo(o2);
+            }
+        });
+
+        List<Instant> endTimes = new ArrayList<Instant>();
+        endTimes.addAll(bwMapDeadlines.keySet());
+        Collections.sort(endTimes, new Comparator<Instant>() {
+            @Override
+            public int compare(Instant o1, Instant o2) {
+                return o1.compareTo(o2);
+            }
+        });
+
+        for(Instant start : startTimes) {
+            for(Instant end : endTimes) {
+                if(Date.from(start).compareTo(Date.from(end)) >= 0) {
+                    // The start time is either AFTER or EQUAL to the end time, so we should continue to the next end time
+                    continue;
+                }
+
+                Integer minimumBandwidth = null;
+                Integer previousBandwidth = null;
+                Boolean optionOver = false;
+
+                for(Instant instant : times) {
+                    if(Date.from(start).compareTo(Date.from(instant)) > 0) {
+                        // This instant is not in the start -> end window, so continue to the next instant
+
+                        // We will however note the bandwidth at this time because this amount of bandwidth may
+                        // bleed into our start -> end window
+
+                        previousBandwidth = bwMap.get(instant);
+
+                        continue;
+                    }
+                    if(Date.from(instant).compareTo(Date.from(end)) >= 0) {
+                        // This instant is either AFTER or EQUAL to our end time
+                        // Either way we will be checking the end time before stopping
+                        instant = end;
+                        optionOver = true;
+                    }
+                    if(minimumBandwidth == null && Date.from(start).compareTo(Date.from(instant)) < 0) {
+                        // The start -> end window did not align perfectly inside our map
+                        // We must keep in mind the 'previousBandwidth' value as it IS bleeding into our window
+                        minimumBandwidth = previousBandwidth;
+                    }
+
+                    Integer bandwidth = bwMap.get(instant);
+
+                    // We will make sure our minimumBandwidth has a value
+                    if (minimumBandwidth == null) {
+                        minimumBandwidth = bandwidth;
+                    }
+
+                    // Now we can determine if the allocation is possible at this point
+                    Integer secondsBetween = (int) (( Date.from(instant).getTime() - Date.from(start).getTime()) / 1000);
+                    Integer bandwidthNeeded = (int) Math.ceil(1.0 * volume / secondsBetween);
+
+                    if(bandwidthNeeded <= minimumBandwidth) {
+                        // Possible connection found!
+                        // We will first determine when the earliest we can finish by is
+                        Integer optionBandwidth = minimumBandwidth;
+                        Integer durationSec = (int) (Math.ceil(1.0 * volume / optionBandwidth));
+                        Date optionStart = Date.from(start);
+                        Date optionEnd = addTime(optionStart, Calendar.SECOND, durationSec);
+                        if(optionEnd.compareTo(earliestDeadline) < 0) {
+                            // This recalculated end time went out of our end window
+                            optionEnd = earliestDeadline;
+                            secondsBetween = (int) (( optionEnd.getTime() - optionStart.getTime()) / 1000);
+                            optionBandwidth = (int) Math.ceil(1.0 * volume / secondsBetween);
+                        }
+                        // We should keep track of the start, end, and bandwidth for later checking
+                        possibleStartTimes.add(optionStart);
+                        possibleEndTimes.add(optionEnd);
+                        possibleBandwidths.add(optionBandwidth);
+
+                        // Now that the best option in this specific window has been found, we can break and try a new window.
+                        break;
+                    }
+                }
+            }
+        }
+
+        for(int i = 0; i < possibleBandwidths.size(); i++) {
+            Date start = possibleStartTimes.get(i);
+            Date end = possibleEndTimes.get(i);
+            Integer bandwidth = possibleBandwidths.get(i);
+
+            // Each connection must have a unique id
+            String connectionId = "startEndWindows" + i;
+
+            // Create an initial connection from parameters
+            Connection conn = createInitialConnection(spec.getSrcDevice(), spec.getSrcPorts(), spec.getDstDevice(),
+                    spec.getDstPorts(), bandwidth, bandwidth, connectionId, start, end);
+
+            testAndAddConnection(connections, conn);
+        }
+
+        return connections;
+    }
+
+
+
     /**
      * Generate a list of viable connections given a Start Date, End Date, and requested transfer Volume.
      * Provide the minimum needed bandwidth, and the maximum possible.
