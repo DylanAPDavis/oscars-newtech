@@ -10,9 +10,7 @@ import java.util.List;
 @AllArgsConstructor
 public class ExParams {
 
-    private List<ExIfce> ifces;
-
-    private ExVlan exVlan;
+    private List<ExVlan> vlans;
 
 
 }

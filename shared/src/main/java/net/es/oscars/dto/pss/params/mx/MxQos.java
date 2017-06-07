@@ -7,11 +7,15 @@ import net.es.oscars.dto.pss.params.Policing;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MxPolicer {
+public class MxQos {
 
-    private String name;
+    private String policerName;
+
+    private String filterName;
 
     private Integer mbps;
+
+    private boolean apply;
 
     private Policing policing;
 }

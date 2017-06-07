@@ -10,9 +10,6 @@ public class ExIfce {
 
     private String port;
 
-    private String vlan_name;
-
-
 }
 
 

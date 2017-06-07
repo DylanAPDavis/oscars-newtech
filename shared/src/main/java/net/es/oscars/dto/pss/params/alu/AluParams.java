@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import net.es.oscars.dto.pss.params.Lsp;
 import net.es.oscars.dto.pss.params.MplsPath;
+import net.es.oscars.dto.pss.params.mx.MxIfce;
 
 import java.util.List;
 
@@ -16,6 +17,9 @@ import java.util.List;
 public class AluParams {
 
     private AluVpls aluVpls;
+
+    private List<MxIfce> ifces;
+
     private List<AluSdp> sdps;
 
     private List<AluQos> qoses;

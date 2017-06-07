@@ -13,11 +13,18 @@ import org.springframework.stereotype.Component;
 public class RouterConfigBuilder {
     private RancidProps props;
     private AluCommandGenerator acg;
+    private MxCommandGenerator mcg;
+    private ExCommandGenerator ecg;
 
     @Autowired
-    public RouterConfigBuilder(RancidProps props, AluCommandGenerator acg) {
+    public RouterConfigBuilder(RancidProps props,
+                               AluCommandGenerator acg,
+                               MxCommandGenerator mcg,
+                               ExCommandGenerator ecg) {
         this.props = props;
         this.acg = acg;
+        this.mcg = mcg;
+        this.ecg = ecg;
     }
 
     public String generate(Command command) throws ConfigException {
@@ -66,8 +73,11 @@ public class RouterConfigBuilder {
             case ALCATEL_SR7750:
                 routerConfig = acg.build(command.getAlu());
                 break;
-            case JUNIPER_MX:
             case JUNIPER_EX:
+                routerConfig = ecg.build(command.getEx());
+                break;
+            case JUNIPER_MX:
+                routerConfig = mcg.build(command.getMx());
                 break;
             default:
                 throw new ConfigException("unknown model");
@@ -83,8 +93,11 @@ public class RouterConfigBuilder {
             case ALCATEL_SR7750:
                 routerConfig = acg.dismantle(command.getAlu());
                 break;
-            case JUNIPER_MX:
             case JUNIPER_EX:
+                routerConfig = ecg.dismantle(command.getEx());
+                break;
+            case JUNIPER_MX:
+                routerConfig = mcg.dismantle(command.getMx());
                 break;
             default:
                 throw new ConfigException("unknown model");

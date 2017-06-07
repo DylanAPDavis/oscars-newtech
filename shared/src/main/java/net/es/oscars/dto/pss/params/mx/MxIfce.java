@@ -14,5 +14,7 @@ public class MxIfce {
 
     private String description;
 
+    private String statsFilter;
+
 
 }

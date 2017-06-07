@@ -22,7 +22,7 @@ public class MxParams {
     private List<MplsPath> paths;
 
 
-    private Map<String, MxPolicer> policing;
+    private Map<String, MxQos> policing;
 
     private MxVpls mxVpls;
 

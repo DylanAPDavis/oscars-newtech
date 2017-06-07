@@ -2,6 +2,8 @@ package net.es.oscars.dto.pss.params.ex;
 
 import lombok.*;
 
+import java.util.List;
+
 
 @Data
 @Builder
@@ -14,5 +16,8 @@ public class ExVlan {
     private String description;
 
     private String name;
+
+    private List<ExIfce> ifces;
+
 
 }

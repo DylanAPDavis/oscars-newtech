@@ -13,21 +13,20 @@ public class MxVpls {
 
     private Integer vcId;
 
-    private List<MxIfce> ifces;
+    private List<String> ifces;
 
     private String serviceName;
 
     private String description;
 
-
     private String loopback;
 
-    private String communityName;
-
+    private String community;
 
     private String policyName;
 
-    private Map<String, String> lspNeighbors;
+    private String statsFilter;
+
 
 
 }
