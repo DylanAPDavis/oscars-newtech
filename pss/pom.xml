@@ -8,8 +8,15 @@
         <groupId>net.es.oscars</groupId>
         <version>1.0.0-beta</version>
     </parent>
+
+    <organization>
+        <name>${rpm.organization.name}</name>
+        <url>${rpm.organization.url}</url>
+    </organization>
+
     <properties>
-        <testcase.groups>net.es.oscars.pss.ctg.UnitTests</testcase.groups>
+        <cucumber.options>--tags @unit --strict</cucumber.options>
+        <rpm.home>/usr/local/esnet/oscars-pss</rpm.home>
     </properties>
 
 
@@ -19,31 +26,55 @@
         <profile>
             <id>unit</id>
             <properties>
-                <testcase.groups>net.es.oscars.pss.ctg.UnitTests</testcase.groups>
+                <cucumber.options>--tags @unit --strict</cucumber.options>
             </properties>
         </profile>
         <profile>
-            <id>router</id>
+            <id>live</id>
             <properties>
-                <testcase.groups>net.es.oscars.pss.ctg.RouterTests</testcase.groups>
+                <cucumber.options>--tags @live --strict</cucumber.options>
             </properties>
         </profile>
         <profile>
             <id>alu</id>
             <properties>
-                <testcase.groups>net.es.oscars.pss.ctg.AluTests</testcase.groups>
+                <cucumber.options>--tags @alu --strict</cucumber.options>
+            </properties>
+        </profile>
+        <profile>
+            <id>mx</id>
+            <properties>
+                <cucumber.options>--tags @mx --strict</cucumber.options>
+            </properties>
+        </profile>
+        <profile>
+            <id>ex</id>
+            <properties>
+                <cucumber.options>--tags @ex --strict</cucumber.options>
             </properties>
         </profile>
         <profile>
             <id>controlplane</id>
             <properties>
-                <testcase.groups>net.es.oscars.pss.ctg.ControlPlaneTests</testcase.groups>
+                <cucumber.options>--tags @controlplane --strict</cucumber.options>
+            </properties>
+        </profile>
+        <profile>
+            <id>routerconfig</id>
+            <properties>
+                <cucumber.options>--tags @routerconfig --strict</cucumber.options>
+            </properties>
+        </profile>
+        <profile>
+            <id>wip</id>
+            <properties>
+                <cucumber.options>--tags @wip --strict</cucumber.options>
             </properties>
         </profile>
         <profile>
             <id>noTest</id>
             <properties>
-                <maven.test.skip>true</maven.test.skip>
+                <cucumber.options>--tags @none --strict</cucumber.options>
             </properties>
         </profile>
     </profiles>
@@ -95,6 +126,10 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -104,6 +139,21 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>info.cukes</groupId>
+            <artifactId>cucumber-java</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>info.cukes</groupId>
+            <artifactId>cucumber-spring</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>info.cukes</groupId>
+            <artifactId>cucumber-junit</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -129,16 +179,123 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.13</version>
+                <version>2.20</version>
                 <dependencies>
                     <dependency>
                         <groupId>org.apache.maven.surefire</groupId>
                         <artifactId>surefire-junit47</artifactId>
-                        <version>2.13</version>
+                        <version>2.20</version>
                     </dependency>
                 </dependencies>
                 <configuration>
-                    <groups>${testcase.groups}</groups>
+                    <systemPropertyVariables>
+                        <cucumber.options>${cucumber.options}</cucumber.options>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>rpm-maven-plugin</artifactId>
+                <version>2.1.5</version>
+                <configuration>
+                    <name>oscars-pss</name>
+                    <group>Unspecified</group>
+                    <description>OSCARS PSS</description>
+                    <prefix>${rpm.home}</prefix>
+                    <license>${rpm.license}</license>
+
+                    <defineStatements>
+                        <defineStatement>_unpackaged_files_terminate_build 0</defineStatement>
+                    </defineStatements>
+                    <mappings>
+                        <mapping>
+                            <directory>${rpm.home}/lib</directory>
+                            <sources>
+                                <source>
+                                    <location>${project.basedir}/target/${project.artifactId}-${project.version}.jar</location>
+                                </source>
+				<softlinkSource>
+				    <destination>${project.artifactId}.jar</destination>
+				    <location>${project.artifactId}-${project.version}.jar</location>
+				</softlinkSource>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>${rpm.home}/config</directory>
+                            <configuration>noreplace</configuration>
+                            <sources>
+                                <source>
+                                    <location>${project.basedir}/config/application.properties</location>
+                                </source>
+                                <source>
+                                    <location>${project.basedir}/config/oscars.jks</location>
+                                </source>
+                                <source>
+                                    <location>${project.basedir}/config/cloginrc.txt</location>
+                                </source>
+                                <source>
+                                    <location>${project.basedir}/config/</location>
+                                    <includes>
+                                        <include>*.json</include>
+                                    </includes>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>${rpm.home}/config/templates/alu</directory>
+                            <sources>
+                                <source>
+                                    <location>${project.basedir}/config/templates/alu</location>
+                                    <includes>
+                                        <include>*</include>
+                                    </includes>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>${rpm.home}/config/templates/ex</directory>
+                            <sources>
+                                <source>
+                                    <location>${project.basedir}/config/templates/ex</location>
+                                    <includes>
+                                        <include>*</include>
+                                    </includes>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>${rpm.home}/config/templates/mx</directory>
+                            <sources>
+                                <source>
+                                    <location>${project.basedir}/config/templates/mx</location>
+                                    <includes>
+                                        <include>*</include>
+                                    </includes>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>${rpm.home}/config/templates</directory>
+                            <sources>
+                                <source>
+                                    <location>${project.basedir}/config/templates/top.ftl</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>${rpm.home}/logs</directory>
+                        </mapping>
+                        <mapping>
+                            <directory>/etc/systemd/system</directory>
+                            <directoryIncluded>false</directoryIncluded>
+                            <sources>
+                                <source>
+                                    <location>${project.basedir}/oscars-pss.service</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                    </mappings>
                 </configuration>
             </plugin>
         </plugins>

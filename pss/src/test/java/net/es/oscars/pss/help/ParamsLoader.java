@@ -18,11 +18,20 @@ import java.util.List;
 @Component
 @Slf4j
 public class ParamsLoader {
-
     @Autowired
+    public ParamsLoader(PssTestConfig pssTestConfig) {
+        this.pssTestConfig = pssTestConfig;
+    }
+
     private PssTestConfig pssTestConfig;
 
-    public List<RouterTestSpec> loadSpecs(CommandType type) throws IOException,ConfigException {
+    private List<RouterTestSpec> specs = new ArrayList<>();
+
+    public List<RouterTestSpec> getSpecs() {
+        return this.specs;
+    }
+
+    public void loadSpecs(CommandType type) throws IOException,ConfigException {
         List<RouterTestSpec> result = new ArrayList<>();
 
         String[] extensions = {"json"};
@@ -30,7 +39,7 @@ public class ParamsLoader {
         File dir = new File(pssTestConfig.getCaseDirectory());
         Iterator<File> files = FileUtils.iterateFiles(dir, extensions, false);
         ObjectMapper mapper = new ObjectMapper();
-        String prefix = "";
+        String prefix;
         switch (type) {
             case BUILD:
                 prefix = "build";
@@ -45,6 +54,8 @@ public class ParamsLoader {
                 prefix = "cfg_status";
                 break;
             case CONTROL_PLANE_STATUS:
+                prefix = "cpl_status";
+                break;
             default:
                 throw new ConfigException("no test specification for " + type);
 
@@ -53,17 +64,26 @@ public class ParamsLoader {
         while (files.hasNext()) {
             File f = files.next();
             if (f.getName().startsWith(prefix)) {
-                log.info(f.getName() + " does start with "+prefix);
-                log.info("loading spec from "+f.getName());
+                log.debug(f.getName() + " does start with "+prefix);
+                log.debug("loading spec from "+f.getName());
                 RouterTestSpec spec = mapper.readValue(f, RouterTestSpec.class);
                 spec.setFilename(f.getName());
                 result.add(spec);
             }
         }
-        return result;
+        log.debug("loaded "+result.size()+ " specs");
+        this.specs = result;
     }
 
-    public RouterTestSpec loadSpec(String path) throws IOException{
+    public RouterTestSpec addSpec(String path) throws IOException{
+        RouterTestSpec spec = this.getSpec(path);
+        specs.add(spec);
+        return spec;
+    }
+
+
+
+    private RouterTestSpec getSpec(String path) throws IOException{
         ObjectMapper mapper = new ObjectMapper();
 
         File f = new File(path);

@@ -2,13 +2,14 @@ package net.es.oscars;
 
 import lombok.extern.slf4j.Slf4j;
 import net.es.oscars.authnz.pop.AuthnzPopulator;
-import net.es.oscars.conf.pop.ConfigPopulator;
+import net.es.oscars.helpers.StartupProperties;
 import net.es.oscars.pss.pop.UrnAddressImporter;
+import net.es.oscars.tasks.ClearPicked;
 import net.es.oscars.tasks.ResvProcessor;
 import net.es.oscars.topo.pop.ConsistencyException;
 import net.es.oscars.topo.pop.TopoFileImporter;
 import net.es.oscars.topo.pop.ConsistencyChecker;
-import net.es.oscars.ui.pop.UIPopulator;
+import net.es.oscars.topo.pop.UIPopulator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
@@ -25,9 +26,10 @@ public class Startup {
     private UIPopulator uiPopulator;
     private UrnAddressImporter urnAddressImporter;
     private ResvProcessor processor;
-    private ConfigPopulator configPopulator;
     private AuthnzPopulator authnzPopulator;
     private ConsistencyChecker consistencyChecker;
+    private StartupProperties startupProperties;
+    private ClearPicked clearPicked;
 
     @Bean
     public Executor taskExecutor() {
@@ -36,26 +38,33 @@ public class Startup {
 
     @Autowired
     public Startup(TopoFileImporter importer, UIPopulator populator, UrnAddressImporter urnAddressImporter,
-                   ResvProcessor processor, ConfigPopulator configPopulator, AuthnzPopulator authnzPopulator,
-                   ConsistencyChecker consistencyChecker ) {
+                   ResvProcessor processor, AuthnzPopulator authnzPopulator,
+                   ConsistencyChecker consistencyChecker, StartupProperties startupProperties,
+                   ClearPicked clearPicked) {
 
         this.processor = processor;
-        this.configPopulator = configPopulator;
         this.authnzPopulator = authnzPopulator;
         this.importer = importer;
         this.uiPopulator = populator;
         this.urnAddressImporter = urnAddressImporter;
         this.consistencyChecker = consistencyChecker;
+        this.startupProperties = startupProperties;
+        this.clearPicked = clearPicked;
     }
 
     void onStart() throws IOException, ConsistencyException {
+        if (startupProperties.getExit()) {
+            System.out.println("Exiting..");
+            System.exit(0);
+        }
+        System.out.println(startupProperties.getBanner());
+
         importer.startup();
         uiPopulator.startup();
         urnAddressImporter.startup();
         processor.startup();
-        configPopulator.startup();
         authnzPopulator.startup();
-
+        clearPicked.startup();
         consistencyChecker.checkConsistency();
     }
 
