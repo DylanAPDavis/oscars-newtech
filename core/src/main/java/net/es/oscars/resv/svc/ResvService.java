@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
@@ -164,9 +165,62 @@ public class ResvService {
     // internal convenience
 
     private ConnectionE deleteReserved(ConnectionE c) {
-        ReservedVlanFlowE emptyFlow = ReservedVlanFlowE.builder().containerConnectionId(c.getConnectionId()).build();
-        ReservedBlueprintE reserved = ReservedBlueprintE.builder().vlanFlow(emptyFlow).containerConnectionId(c.getConnectionId()).build();
-        c.setReserved(reserved);
+        ReservedVlanFlowE currentFlow = c.getReserved().getVlanFlow();
+        Set<ReservedEthPipeE> ethPipes = currentFlow.getEthPipes();
+        Set<ReservedMplsPipeE> mplsPipes = currentFlow.getMplsPipes();
+
+        Set<ReservedBandwidthE> reservedBandwidths = new HashSet<>();
+        Set<ReservedVlanE> reservedVlans = new HashSet<>();
+        for(ReservedEthPipeE pipe: ethPipes){
+            // Get bandwidths
+            reservedBandwidths.addAll(pipe.getReservedBandwidths());
+            reservedBandwidths.addAll(pipe.getAJunction().getFixtures().stream().map(ReservedVlanFixtureE::getReservedBandwidth).collect(Collectors.toSet()));
+            reservedBandwidths.addAll(pipe.getZJunction().getFixtures().stream().map(ReservedVlanFixtureE::getReservedBandwidth).collect(Collectors.toSet()));
+            // Get pipe VLANs
+            reservedVlans.addAll(pipe.getReservedVlans());
+            // Get A junction VLANs
+            reservedVlans.addAll(pipe.getAJunction().getReservedVlans());
+            reservedVlans.addAll(pipe.getAJunction().getFixtures().stream()
+                    .map(ReservedVlanFixtureE::getReservedVlans)
+                    .filter(Objects::nonNull)
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.toSet()));
+            // Get Z junction VLANs
+            reservedVlans.addAll(pipe.getZJunction().getReservedVlans());
+            reservedVlans.addAll(pipe.getZJunction().getFixtures().stream()
+                    .map(ReservedVlanFixtureE::getReservedVlans)
+                    .filter(Objects::nonNull)
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.toSet()));
+        }
+        for(ReservedMplsPipeE pipe: mplsPipes){
+            // Get bandwidths
+            reservedBandwidths.addAll(pipe.getReservedBandwidths());
+            reservedBandwidths.addAll(pipe.getAJunction().getFixtures().stream().map(ReservedVlanFixtureE::getReservedBandwidth).collect(Collectors.toSet()));
+            reservedBandwidths.addAll(pipe.getZJunction().getFixtures().stream().map(ReservedVlanFixtureE::getReservedBandwidth).collect(Collectors.toSet()));
+            // Get A junction VLANs
+            reservedVlans.addAll(pipe.getAJunction().getReservedVlans());
+            reservedVlans.addAll(pipe.getAJunction().getFixtures().stream()
+                    .map(ReservedVlanFixtureE::getReservedVlans)
+                    .filter(Objects::nonNull)
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.toSet()));
+            // Get Z junction VLANs
+            reservedVlans.addAll(pipe.getZJunction().getReservedVlans());
+            reservedVlans.addAll(pipe.getZJunction().getFixtures().stream()
+                    .map(ReservedVlanFixtureE::getReservedVlans)
+                    .filter(Objects::nonNull)
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.toSet()));
+        }
+        for(ReservedBandwidthE resvBw : reservedBandwidths){
+            resvBw.setInBandwidth(0);
+            resvBw.setEgBandwidth(0);
+        }
+        for(ReservedVlanE resvVlan : reservedVlans){
+            resvVlan.setVlan(-1);
+        }
+
         return c;
     }
 

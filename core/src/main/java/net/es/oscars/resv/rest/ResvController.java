@@ -353,7 +353,7 @@ public class ResvController {
         ConnectionE connE = resvService.findByConnectionId(connectionId).orElseThrow(NoSuchElementException::new);
         if (connE.getStates().getResv().equals(ResvState.HELD)) {
             connE.getStates().setResv(ResvState.ABORTING);
-            resvService.save(connE);
+            resvService.abort(connE);
         }
 
         return this.convertConnToDto(connE);
