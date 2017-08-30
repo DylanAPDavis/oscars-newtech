@@ -25,9 +25,6 @@ public class RancidProps {
     @NonNull
     private String cloginrc;
 
-    @NonNull
-    private String controlPlaneAddressesFile;
-
 
 }
 

@@ -15,8 +15,7 @@ public class MxQos {
 
     private Integer mbps;
 
-    private MxQosForwarding forwarding;
-    private boolean createPolicer;
+    private boolean apply;
 
     private Policing policing;
 }

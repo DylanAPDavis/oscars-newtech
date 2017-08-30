@@ -13,7 +13,7 @@ public class MxVpls {
 
     private Integer vcId;
 
-    private Integer communityId;
+    private List<String> ifces;
 
     private String serviceName;
 
@@ -26,5 +26,7 @@ public class MxVpls {
     private String policyName;
 
     private String statsFilter;
+
+
 
 }

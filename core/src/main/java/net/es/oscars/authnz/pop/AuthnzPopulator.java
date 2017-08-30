@@ -2,13 +2,14 @@ package net.es.oscars.authnz.pop;
 
 import lombok.extern.slf4j.Slf4j;
 import net.es.oscars.authnz.dao.UserRepository;
-import net.es.oscars.authnz.ent.PermissionsE;
-import net.es.oscars.authnz.ent.UserE;
+import net.es.oscars.authnz.ent.EPermissions;
+import net.es.oscars.authnz.ent.EUser;
 import net.es.oscars.authnz.prop.AuthnzProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import java.util.List;
 
 @Slf4j
@@ -25,31 +26,31 @@ public class AuthnzPopulator {
 
     public void startup() {
 
-        List<UserE> users = userRepo.findAll();
+        List<EUser> users = userRepo.findAll();
 
         if (users.isEmpty()) {
-            log.info("No users in database; adding an admin user from admin.username / .password properties.");
+            log.info("No users in database; adding an admin user from authnz.username / .password properties.");
             if (properties == null) {
-                log.info("No 'admin.username / .password' application properties set!");
+                log.info("No authnz application property set!");
                 return;
             }
 
             String username = properties.getUsername();
             String password = properties.getPassword();
             if (username == null) {
-                log.info("Null admin.username application property!");
+                log.info("Null authnz.username application property!");
                 return;
             }
             if (password == null) {
-                log.info("Null admin.password application property!");
+                log.info("Null authnz.password application property!");
                 return;
             }
 
             String encoded = new BCryptPasswordEncoder().encode(password);
-            UserE admin = UserE.builder()
+            EUser admin = EUser.builder()
                     .username(username)
                     .password(encoded)
-                    .permissions(new PermissionsE())
+                    .permissions(new EPermissions())
                     .build();
             admin.getPermissions().setAdminAllowed(true);
             userRepo.save(admin);

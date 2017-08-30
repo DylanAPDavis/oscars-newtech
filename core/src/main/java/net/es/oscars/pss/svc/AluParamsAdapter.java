@@ -35,15 +35,6 @@ public class AluParamsAdapter {
         List<AluSap> saps = new ArrayList<>();
 
         for (ReservedVlanFixtureE rvf : rvj.getFixtures()) {
-
-            Integer vlan = null;
-            for (ReservedVlanE rv : rvf.getReservedVlans()) {
-                vlan = rv.getVlan();
-            }
-            if (vlan == null) {
-                throw new PSSException("no VLAN reserved");
-            }
-
             ReservedPssResourceE inQosIdRes = null;
             ReservedPssResourceE egQosIdRes = null;
             for (ReservedPssResourceE rpr : rvf.getReservedPssResources()) {
@@ -60,14 +51,13 @@ public class AluParamsAdapter {
             }
             String port = parts[1];
 
-            String configPortStr = port.replace('/', '_')+'_'+vlan;
             if (inQosIdRes != null) {
                 AluQos qos = AluQos.builder()
                         .description(c.getConnectionId())
                         .mbps(rvf.getReservedBandwidth().getInBandwidth())
                         .policing(Policing.STRICT)
                         .policyId(inQosIdRes.getResource())
-                        .policyName(c.getConnectionId() + "-" + configPortStr + "-in")
+                        .policyName(c.getConnectionId() + "-" + port + "-in")
                         .type(AluQosType.SAP_INGRESS)
                         .build();
                 qoses.add(qos);
@@ -82,12 +72,20 @@ public class AluParamsAdapter {
                         .mbps(rvf.getReservedBandwidth().getInBandwidth())
                         .policing(Policing.STRICT)
                         .policyId(egQosIdRes.getResource())
-                        .policyName(c.getConnectionId() + "-" + configPortStr + "-eg")
+                        .policyName(c.getConnectionId() + "-" + port + "-eg")
                         .type(AluQosType.SAP_EGRESS)
                         .build();
                 qoses.add(qos);
             } else {
                 throw new PSSException("no egress qos id");
+            }
+
+            Integer vlan = null;
+            for (ReservedVlanE rv : rvf.getReservedVlans()) {
+                vlan = rv.getVlan();
+            }
+            if (vlan == null) {
+                throw new PSSException("no VLAN reserved");
             }
 
 
@@ -96,7 +94,7 @@ public class AluParamsAdapter {
                     .ingressQosId(inQosIdRes.getResource())
                     .egressQosId(egQosIdRes.getResource())
                     .port(port)
-                    .description(c.getConnectionId()+" - "+configPortStr)
+                    .description(c.getConnectionId()+"-"+port+":"+vlan)
                     .build();
             saps.add(sap);
         }

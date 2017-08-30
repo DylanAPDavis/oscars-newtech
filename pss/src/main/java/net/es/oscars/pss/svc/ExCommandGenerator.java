@@ -4,7 +4,8 @@ import freemarker.template.TemplateException;
 import lombok.extern.slf4j.Slf4j;
 import net.es.oscars.dto.pss.params.ex.ExParams;
 import net.es.oscars.dto.pss.params.ex.ExVlan;
-import net.es.oscars.pss.beans.*;
+import net.es.oscars.pss.beans.ConfigException;
+import net.es.oscars.pss.beans.ExTemplatePaths;
 import net.es.oscars.pss.tpl.Assembler;
 import net.es.oscars.pss.tpl.Stringifier;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,20 +17,16 @@ import java.util.*;
 @Slf4j
 @Component
 public class ExCommandGenerator {
-    private Stringifier stringifier;
-    private Assembler assembler;
-    private KeywordValidator validator;
 
     @Autowired
-    public ExCommandGenerator(Stringifier stringifier, Assembler assembler, KeywordValidator validator) {
-        this.stringifier = stringifier;
-        this.assembler = assembler;
-        this.validator = validator;
-    }
+    private Stringifier stringifier;
+
+    @Autowired
+    private Assembler assembler;
 
     public String dismantle(ExParams params) throws ConfigException {
         this.protectVsNulls(params);
-        this.verifyParams(params);
+        this.verifyVlans(params);
         ExTemplatePaths exp = ExTemplatePaths.builder()
                 .vlan("ex/dismantle-ex-vlan.ftl")
                 .build();
@@ -38,7 +35,7 @@ public class ExCommandGenerator {
 
     public String build(ExParams params) throws ConfigException {
         this.protectVsNulls(params);
-        this.verifyParams(params);
+        this.verifyVlans(params);
         ExTemplatePaths exp = ExTemplatePaths.builder()
                 .vlan("ex/build-ex-vlan.ftl")
                 .build();
@@ -74,7 +71,7 @@ public class ExCommandGenerator {
             throw new ConfigException("null VLANs in Juniper EX params");
         }
         for (ExVlan vlan : params.getVlans()) {
-            if (vlan.getIfces() == null) {
+            if (vlan.getIfces() == null ) {
                 throw new ConfigException("null ifces in Juniper EX VLAN");
             }
             if (vlan.getDescription() == null) {
@@ -89,50 +86,21 @@ public class ExCommandGenerator {
         }
     }
 
-    private void verifyParams(ExParams params) throws ConfigException {
-        StringBuilder errorStr = new StringBuilder("");
-        Boolean hasError = false;
-
-        Map<KeywordWithContext, KeywordValidationCriteria> keywordMap = new HashMap<>();
-        KeywordValidationCriteria alphanum_criteria = KeywordValidationCriteria.builder()
-                .format(KeywordFormat.ALPHANUMERIC_DASH_UNDERSCORE)
-                .length(32)
-                .build();
-
+    private void verifyVlans(ExParams params) throws ConfigException {
         if (params.getVlans().size() == 0) {
-            errorStr.append("Empty VLAN list\n");
-            hasError = true;
+            throw new ConfigException("Empty VLAN list for Juniper EX vlan");
         }
-
         for (ExVlan vlan : params.getVlans()) {
             if (vlan.getIfces().size() == 0) {
-                errorStr.append("Empty ifce list\n");
-                hasError = true;
+                throw new ConfigException("empty ifce list Juniper EX VLAN");
             }
-            KeywordWithContext kwc_path = KeywordWithContext.builder()
-                    .context("VLAN name").keyword(vlan.getName())
-                    .build();
-            keywordMap.put(kwc_path, alphanum_criteria);
-
+            if (vlan.getName().length() == 0) {
+                throw new ConfigException("empty name in Juniper EX VLAN");
+            }
             if (vlan.getVlanId() < 2 || vlan.getVlanId() > 4094) {
-                String err = " vlan id " + vlan.getVlanId() + " out of range (2-4094)\n";
-                errorStr.append(err);
-                hasError = true;
+                throw new ConfigException("vlan id out of range in Juniper EX VLAN");
             }
         }
-
-        Map<KeywordWithContext, KeywordValidationResult> results = validator.validate(keywordMap);
-        KeywordValidationResult overall = validator.gatherErrors(results);
-        errorStr.append(overall.getError());
-        if (!overall.getValid()) {
-            hasError = true;
-        }
-
-        if (hasError) {
-            log.error(errorStr.toString());
-            throw new ConfigException(errorStr.toString());
-        }
-
     }
 
 

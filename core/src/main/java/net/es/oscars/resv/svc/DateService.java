@@ -24,13 +24,13 @@ public class DateService {
         return Date.from(localDate.atZone(ZoneId.systemDefault()).toInstant());
     }
 
-    public String convertInstantToString(Instant instant){
+    public String convertInsantToString(Instant instant){
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM dd yyyy hh:mm");
         LocalDateTime ldt = LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
         return ldt.format(formatter);
     }
 
     public String convertDateToString(Date date) {
-        return convertInstantToString(date.toInstant());
+        return convertInsantToString(date.toInstant());
     }
 }

@@ -15,12 +15,6 @@
         <java.version>1.8</java.version>
         <unit-tests.skip>false</unit-tests.skip>
         <integration-tests.skip>true</integration-tests.skip>
-
-        <rpm.home>/usr/local/esnet/oscars-backend</rpm.home>
-        <rpm.prefix/>
-        <rpm.organization.name>ESnet</rpm.organization.name>
-        <rpm.organization.url>https://www.github.com/esnet/oscars-newtech</rpm.organization.url>
-        <rpm.license>BSD</rpm.license>
     </properties>
 
     <pluginRepositories>
@@ -31,9 +25,10 @@
     </pluginRepositories>
 
     <modules>
+        <module>core</module>
         <module>shared</module>
         <module>pss</module>
-        <module>backend</module>
+        <module>webui</module>
     </modules>
     <profiles>
         <profile>
@@ -76,61 +71,10 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
-        <repository>
-            <id>oscars-frontend-mvn-repo</id>
-            <url>https://raw.github.com/esnet/oscars-frontend/mvn-repo/</url>
-            <snapshots>
-                <enabled>true</enabled>
-                <updatePolicy>always</updatePolicy>
-            </snapshots>
-        </repository>
     </repositories>
 
     <dependencyManagement>
         <dependencies>
-            <dependency>
-                <groupId>net.es.oscars</groupId>
-                <artifactId>frontend</artifactId>
-                <version>1.0.2</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.fasterxml.jackson.module</groupId>
-                <artifactId>jackson-module-parameter-names</artifactId>
-                <version>2.8.9</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.datatype</groupId>
-                <artifactId>jackson-datatype-jdk8</artifactId>
-                <version>2.8.9</version>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.module</groupId>
-                <artifactId>jackson-modules-java8</artifactId>
-                <version>2.8.9</version>
-                <type>pom</type>
-            </dependency>
-            <dependency>
-                <groupId>com.fasterxml.jackson.datatype</groupId>
-                <artifactId>jackson-datatype-jsr310</artifactId>
-                <version>2.8.9</version>
-            </dependency>
-            <dependency>
-                <groupId>com.xebia</groupId>
-                <artifactId>jackson-lombok</artifactId>
-                <version>1.1</version>
-            </dependency>
-            <dependency>
-                <groupId>io.springfox</groupId>
-                <artifactId>springfox-swagger-ui</artifactId>
-                <version>2.7.0</version>
-            </dependency>
-
-            <dependency>
-                <groupId>io.springfox</groupId>
-                <artifactId>springfox-swagger2</artifactId>
-                <version>2.7.0</version>
-            </dependency>
             <dependency>
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
@@ -140,16 +84,6 @@
                 <groupId>com.jayway.restassured</groupId>
                 <artifactId>rest-assured</artifactId>
                 <version>2.9.0</version>
-            </dependency>
-            <dependency>
-                <groupId>io.jsonwebtoken</groupId>
-                <artifactId>jjwt</artifactId>
-                <version>0.7.0</version>
-            </dependency>
-            <dependency>
-                <groupId>org.jgrapht</groupId>
-                <artifactId>jgrapht-core</artifactId>
-                <version>1.0.1</version>
             </dependency>
 
             <dependency>
@@ -168,9 +102,45 @@
                 <version>0.4.2</version>
             </dependency>
             <dependency>
+                <groupId>net.sf.jung</groupId>
+                <artifactId>jung-graph-impl</artifactId>
+                <version>2.0.1</version>
+            </dependency>
+            <dependency>
+                <groupId>net.sf.jung</groupId>
+                <artifactId>jung-algorithms</artifactId>
+                <version>2.0.1</version>
+            </dependency>
+            <dependency>
                 <groupId>org.thymeleaf.extras</groupId>
                 <artifactId>thymeleaf-extras-springsecurity4</artifactId>
                 <version>2.1.2.RELEASE</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.webjars</groupId>
+                <artifactId>momentjs</artifactId>
+                <version>2.15.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.webjars</groupId>
+                <artifactId>x-editable-bootstrap</artifactId>
+                <version>1.5.1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.webjars</groupId>
+                <artifactId>bootstrap</artifactId>
+                <version>3.3.7-1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.webjars</groupId>
+                <artifactId>jquery</artifactId>
+                <version>1.12.4</version>
+            </dependency>
+            <dependency>
+                <groupId>org.webjars.bower</groupId>
+                <artifactId>typeahead.js</artifactId>
+                <version>0.11.1</version>
             </dependency>
 
             <dependency>
@@ -202,30 +172,20 @@
                 <version>1.9</version>
             </dependency>
             <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>2.6.1</version>
+            </dependency>
+            <dependency>
                 <groupId>org.hashids</groupId>
                 <artifactId>hashids</artifactId>
                 <version>1.0.1</version>
             </dependency>
             <dependency>
-                <groupId>info.cukes</groupId>
-                <artifactId>cucumber-java</artifactId>
-                <version>1.2.5</version>
-            </dependency>
-            <dependency>
-                <groupId>info.cukes</groupId>
-                <artifactId>cucumber-spring</artifactId>
-                <version>1.2.5</version>
-            </dependency>
-            <dependency>
-                <groupId>info.cukes</groupId>
-                <artifactId>cucumber-junit</artifactId>
-                <version>1.2.5</version>
-            </dependency>
-            <dependency>
                 <!-- Import dependency management from Spring Boot -->
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
-                <version>1.5.4.RELEASE</version>
+                <version>1.5.2.RELEASE</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -238,7 +198,7 @@
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
-                    <version>1.5.4.RELEASE</version>
+                    <version>1.5.2.RELEASE</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

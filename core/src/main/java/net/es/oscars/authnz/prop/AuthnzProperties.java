@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Data
 @Configuration
-@ConfigurationProperties(prefix = "admin")
+@ConfigurationProperties(prefix = "authnz")
 @NoArgsConstructor
 public class AuthnzProperties {
     @NonNull

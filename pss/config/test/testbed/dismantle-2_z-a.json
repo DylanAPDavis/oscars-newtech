@@ -1,0 +1,53 @@
+{
+  "device": "star-tb1",
+  "model": "ALCATEL_SR7750",
+  "shouldFail": false,
+
+  "aluParams": {
+    "aluVpls": {
+      "svcId": 6912,
+      "saps": [
+        {
+          "port": "3/2/1",
+          "vlan": 1381,
+          "ingressQosId": 7200,
+          "egressQosId": 7002
+        }
+      ],
+      "sdpToVcIds": [
+        {
+          "sdpId": 6511,
+          "vcId": 6912
+        }
+      ]
+    },
+    "sdps": [
+      {
+        "sdpId": 6511,
+        "lspName": "OKI9R5-lsp"
+      }
+    ],
+    "qoses": [
+      {
+        "type": "SAP_INGRESS",
+        "policyId": 7200
+      },
+      {
+        "type": "SAP_EGRESS",
+        "policyId": 7002
+      }
+    ],
+    "lsps": [
+      {
+        "name": "OKI9R5-lsp",
+        "pathName": "OKI9R5-path"
+      }
+    ],
+    "paths": [
+      {
+        "name": "OKI9R5-path"
+      }
+    ],
+    "applyQos": true
+  }
+}

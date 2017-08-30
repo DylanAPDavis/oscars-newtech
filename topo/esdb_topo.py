@@ -15,8 +15,7 @@
 import json
 import pprint
 import argparse
-import os
-import sys
+import topo_util
 import requests
 from esnet.topology.today_to_devices import get_devices
 from esnet.topology.today_to_isis_graph import get_isis_neighbors, make_isis_graph
@@ -27,7 +26,7 @@ ESDB_URL = "https://esdb.es.net/esdb_api/v1"
 
 OUTPUT_DEVICES = "output/devices.json"
 OUTPUT_ADJCIES = "output/adjacencies.json"
-
+OUTPUT_ADDRS = "output/addrs.json"
 
 def get_token(opts):
     """Gets the API token from a source.
@@ -58,7 +57,6 @@ def get_token(opts):
 
     return token
 
-
 def main():
     pp = pprint.PrettyPrinter(indent=4)
 
@@ -73,6 +71,8 @@ def main():
                         help="Path to devices output file")
     parser.add_argument('--output-adjacencies', default=OUTPUT_ADJCIES,
                         help="Path to IS-IS adjacencies output file")
+    parser.add_argument('--output-addresses', default=OUTPUT_ADDRS,
+                        help="Path to addresses file")
 
     opts = parser.parse_args()
 
@@ -89,6 +89,7 @@ def main():
     # in particular, we should have gotten only the current snapshot.
     snapshot = r.json()['topology_snapshots'][0]['data']
     today = snapshot['today']
+
 
     # Post-processing of today.json.
     # Get information about routers, ISIS adjacencies, router ports, and IPv4 addresses.
@@ -112,7 +113,7 @@ def main():
 
     merge_phy_ports(oscars_devices=oscars_devices, ports=in_ports, igp_portmap=igp_portmap)
 
-    merge_addrs(oscars_devices=oscars_devices, addrs=addrs, isis_adjcies=isis_adjcies)
+    urn_addrs = make_urn_addrs(addrs=addrs, isis_adjcies=isis_adjcies)
 
     # Dump output files
     with open(opts.output_devices, 'w') as outfile:
@@ -121,8 +122,11 @@ def main():
     with open(opts.output_adjacencies, 'w') as outfile:
         json.dump(oscars_adjcies, outfile, indent=2)
 
+    with open(opts.output_addresses, 'w') as outfile:
+        json.dump(urn_addrs, outfile, indent=2)
 
-def merge_addrs(oscars_devices=None, addrs=None, isis_adjcies=None):
+
+def make_urn_addrs(addrs=None, isis_adjcies=None):
     urn_addrs_dict = {}
     for addr in addrs:
         int_name = addr["int_name"]
@@ -132,22 +136,23 @@ def merge_addrs(oscars_devices=None, addrs=None, isis_adjcies=None):
         if int_name == "lo0.0" or int_name == "system":
             urn = router
             urn_addrs_dict[urn] = address
-
     for isis_adjcy in isis_adjcies:
         address = isis_adjcy["a_addr"]
         router = isis_adjcy["a"]
         port = isis_adjcy["a_port"]
-        urn = router + ":" + port
+        urn = router+":"+port
         urn_addrs_dict[urn] = address
 
+    urn_addrs = []
     for urn in urn_addrs_dict.keys():
-        for device in oscars_devices:
-            if device["urn"] == urn:
-                device["ipv4Address"] = urn_addrs_dict[urn]
-            else:
-                for port in device["ports"]:
-                    if port["urn"] == urn:
-                        port["ipv4Address"] = urn_addrs_dict[urn]
+        entry = {
+            "urn": urn,
+            "ipv4Address": urn_addrs_dict[urn]
+        }
+        urn_addrs.append(entry)
+
+
+    return urn_addrs
 
 
 def filter_out_not_igp(igp_portmap=None, oscars_devices=None):
@@ -168,10 +173,6 @@ def merge_phy_ports(ports=None, oscars_devices=None, igp_portmap=None):
                 for port in ports[device_name].keys():
                     port_ifces = ports[device_name][port]
                     mbps = 0
-
-
-                    # TODO: examine VLANs, remove used vlans, create correct reservable VLANs for output
-                    # TODO: add alias information to port tags
                     for ifce_data in port_ifces:
                         mbps = ifce_data["mbps"]
 
@@ -182,34 +183,21 @@ def merge_phy_ports(ports=None, oscars_devices=None, igp_portmap=None):
 
                     ifce_data = {
                         "urn": device_name + ":" + port,
-                        "reservableIngressBw": mbps,
-                        "reservableEgressBw": mbps
+                        "reservableBw": mbps
                     }
 
                     if port_in_igp:
                         ifce_data["capabilities"] = ["MPLS"]
                     else:
                         ifce_data["capabilities"] = ["ETHERNET"]
-
-                    # TODO: put correct reservable VLANs in output
                         ifce_data["reservableVlans"] = [
                             {
                                 "floor": 2000,
                                 "ceiling": 2999
                             }
                         ]
-                    found_port = False
-                    for out_port in device["ports"]:
-                        if out_port["urn"] == ifce_data["urn"]:
-                            found_port = True
 
-                            out_port["capabilities"] = ifce_data["capabilities"]
-                            out_port["reservableIngressBw"] = ifce_data["reservableIngressBw"]
-                            out_port["reservableEgressBw"] = ifce_data["reservableEgressBw"]
-                            if "reservableVlans" in ifce_data.keys():
-                                out_port["reservableVlans"] = ifce_data["reservableVlans"]
-                    if not found_port:
-                        device["ports"].append(ifce_data)
+                    device["ifces"].append(ifce_data)
 
 
 def merge_isis_ports(oscars_devices=None, igp_portmap=None):
@@ -222,7 +210,7 @@ def merge_isis_ports(oscars_devices=None, igp_portmap=None):
                     mbps = igp_portmap[device_name][port_name]["mbps"]
                     port_urn = device_name + ":" + port_name
                     found_port = False
-                    for ifce_data in device["ports"]:
+                    for ifce_data in device["ifces"]:
                         if ifce_data["urn"] == port_urn:
                             found_port = True
                             if "MPLS" not in ifce_data["capabilities"]:
@@ -232,10 +220,9 @@ def merge_isis_ports(oscars_devices=None, igp_portmap=None):
                         new_ifce_data = {
                             "urn": port_urn,
                             "capabilities": ["MPLS"],
-                            "reservableIngressBw": mbps,
-                            "reservableEgressBw": mbps
+                            "reservableBw": mbps
                         }
-                        device["ports"].append(new_ifce_data)
+                        device["ifces"].append(new_ifce_data)
         if not found_device:
             raise ValueError("can't find device %s" % device_name)
 
@@ -249,7 +236,7 @@ def transform_devices(in_devices=None):
             "model": model,
             "type": "ROUTER",
             "capabilities": ["ETHERNET", "MPLS"],
-            "ports": [],
+            "ifces": [],
             "reservableVlans": []
         }
         out_routers.append(out_router)
@@ -302,8 +289,8 @@ def transform_isis(isis_adjcies=None):
             igp_portmap[a_router][a_port] = {
                 "mbps": isis_adjcy["mbps"]
             }
-            # else:
-            #   print "skipping " + a_addr
+        # else:
+        #   print "skipping " + a_addr
 
     return oscars_adjcies, igp_portmap
 
@@ -323,19 +310,19 @@ def best_urns_by_addr(isis_adjcies=None):
         ifce_urn_a = None
         if "a_ifce" in isis_adjcy.keys():
             ifce_a = isis_adjcy["a_ifce"]
-            ifce_urn_a = router_a + ":" + ifce_a
+            ifce_urn_a = router_a + ":" +ifce_a
             if ifce_urn_a in all_ifce_urns:
                 dupe_ifce_urns.append(ifce_urn_a)
             else:
                 all_ifce_urns.append(ifce_urn_a)
 
-        port_urn_a = router_a + ":" + port_a
+        port_urn_a = router_a + ":" +port_a
         if port_urn_a in all_port_urns:
             dupe_port_urns.append(port_urn_a)
         else:
             all_port_urns.append(port_urn_a)
 
-        addr_urn_a = router_a + ":" + addr_a
+        addr_urn_a = router_a + ":" +addr_a
 
         entry = {
             "port_urn": port_urn_a,
@@ -352,12 +339,12 @@ def best_urns_by_addr(isis_adjcies=None):
             best_urns[addr] = entry["port_urn"]
         elif entry["ifce_urn"] is not None:
             best_urns[addr] = None
-        # best_urns[addr] = entry["ifce_urn"]
+        #   best_urns[addr] = entry["ifce_urn"]
         #   print "dupe urn! " + entry["ifce_urn"]
         else:
             best_urns[addr] = None
-            #   best_urns[addr] = entry["addr_urn"]
-            #   print "dupe urn! " + entry["addr_urn"]
+        #   best_urns[addr] = entry["addr_urn"]
+        #   print "dupe urn! " + entry["addr_urn"]
     return best_urns
 
 

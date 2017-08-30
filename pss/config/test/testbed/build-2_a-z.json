@@ -1,0 +1,77 @@
+{
+  "device": "nersc-tb1",
+  "model": "ALCATEL_SR7750",
+  "shouldFail": false,
+
+  "aluParams": {
+    "aluVpls": {
+      "svcId": 6912,
+      "saps": [
+        {
+          "port": "3/1/1",
+          "vlan": 1381,
+          "ingressQosId": 7100,
+          "egressQosId": 7001,
+          "description": "sap description"
+        }
+      ],
+      "serviceName": "OKI9R5",
+      "description": "NERSC - STAR testing",
+      "endpointName": "OKI9R5-endpoint",
+      "sdpToVcIds": [
+        {
+          "sdpId": 6511,
+          "vcId": 6912
+        }
+      ]
+    },
+    "sdps": [
+      {
+        "sdpId": 6511,
+        "lspName": "OKI9R5-lsp",
+        "description": "OKI9R5 SDP",
+        "farEnd": "192.124.57.8"
+      }
+    ],
+    "qoses": [
+      {
+        "type": "SAP_INGRESS",
+        "policing": "STRICT",
+        "mbps": 100,
+        "policyId": 7100,
+        "policyName": "OKI9R5-8112",
+        "description": "OKI9R5"
+      },
+      {
+        "type": "SAP_EGRESS",
+        "policing": "STRICT",
+        "mbps": 100,
+        "policyId": 7001,
+        "policyName": "OKI9R5-7001",
+        "description": "OKI9R5"
+      }
+    ],
+    "lsps": [
+      {
+        "name": "OKI9R5-lsp",
+        "pathName": "OKI9R5-path",
+        "setupPriority": 5,
+        "holdPriority": 5,
+        "metric": 65100,
+        "to": "192.124.57.8"
+      }
+    ],
+    "paths": [
+      {
+        "name": "OKI9R5-path",
+        "hops": [
+          {
+            "order": 1,
+            "address": "192.124.57.137"
+          }
+        ]
+      }
+    ],
+    "applyQos": true
+  }
+}

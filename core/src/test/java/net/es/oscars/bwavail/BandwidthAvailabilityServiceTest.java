@@ -13,7 +13,6 @@ import net.es.oscars.topo.ent.UrnE;
 import net.es.oscars.topo.svc.TopoService;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -23,7 +22,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Transactional
-
 public class BandwidthAvailabilityServiceTest extends AbstractCoreTest {
 
     @Autowired
@@ -31,6 +29,9 @@ public class BandwidthAvailabilityServiceTest extends AbstractCoreTest {
 
     @Autowired
     private TopologyBuilder topologyBuilder;
+
+    @Autowired
+    private TopoService topoService;
 
     @Autowired
     private UrnRepository urnRepo;

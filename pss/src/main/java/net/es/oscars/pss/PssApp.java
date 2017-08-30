@@ -1,6 +1,5 @@
 package net.es.oscars.pss;
 
-import net.es.oscars.pss.beans.UrnMappingException;
 import net.es.oscars.pss.go.Startup;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -22,7 +21,7 @@ public class PssApp {
         Startup startup = (Startup)app.getBean("startup");
         try {
             startup.onStart();
-        } catch (UrnMappingException | IOException ex) {
+        } catch (IOException ex) {
             System.err.print("Startup error");
             ex.printStackTrace();
             System.exit(1);

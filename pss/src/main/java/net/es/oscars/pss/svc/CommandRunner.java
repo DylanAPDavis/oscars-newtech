@@ -5,7 +5,10 @@ import net.es.oscars.dto.pss.cmd.Command;
 import net.es.oscars.dto.pss.cmd.CommandStatus;
 import net.es.oscars.dto.pss.st.*;
 import net.es.oscars.dto.topo.enums.DeviceModel;
-import net.es.oscars.pss.beans.*;
+import net.es.oscars.pss.beans.ConfigException;
+import net.es.oscars.pss.beans.ConfigResult;
+import net.es.oscars.pss.beans.ControlPlaneException;
+import net.es.oscars.pss.beans.ControlPlaneResult;
 import net.es.oscars.pss.rancid.RancidArguments;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -55,7 +58,7 @@ public class CommandRunner {
                     break;
 
             }
-        } catch (UrnMappingException | ConfigException ex) {
+        } catch (ControlPlaneException | ConfigException ex) {
             log.error("error", ex);
             status.setControlPlaneStatus(ControlPlaneStatus.ERROR);
         }
@@ -77,8 +80,7 @@ public class CommandRunner {
         return result;
     }
 
-    private ControlPlaneResult cplStatus(String device, DeviceModel model)
-            throws UrnMappingException {
+    private ControlPlaneResult cplStatus(String device, DeviceModel model) throws ControlPlaneException {
 
         ControlPlaneResult result = ControlPlaneResult.builder().build();
 
